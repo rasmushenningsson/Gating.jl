@@ -8,7 +8,8 @@ using Colors
 using UMAP
 using PointInPoly
 
-export gate
+export gate,
+       annotate!
 
 abstract type AbstractGater end
 

@@ -9,14 +9,14 @@ DataView(data) = DataView(data,nothing,nothing)
 function get_reduced(v::DataView)
 	if v.reduced === nothing
 		@info "Computing SVD"
-		v.reduced = svd(v.data; nsv=50)
+		v.reduced = svd(v.data; nsv=50, obs=:keep)
 	end
 	v.reduced
 end
 function get_umapped(v::DataView)
 	if v.umapped === nothing
 		@info "Computing UMAP"
-		v.umapped = umap(get_reduced(v), 2)
+		v.umapped = umap(get_reduced(v), 2; obs=:keep)
 	end
 	v.umapped
 end
@@ -119,8 +119,6 @@ function Base.push!(gater::SingleCellGater, ids::DataFrame)
 
 	ids = copy(ids; copycols=false)
 	ids.__present__ .= true 
-
-	# mask = gater.data.obs 
 	merged = leftjoin(gater.data.obs, ids; on=gater.data.obs_id_cols, order=:left)
 	mask = .!ismissing.(merged.__present__) 
 
@@ -251,4 +249,39 @@ function gate(data::DataMatrix)
 	gater
 end
 
+function annotate!(gater::SingleCellGater, col, a::T1=true, b::T2=nothing) where {T1,T2}
+	T = T2 === Nothing ? T1 : Union{T1,T2}
+
+	cv = curr_view(gater)
+	mask = poly_mask(gater.poly_coords[], gater.coords[])
+
+
+	ids = select(cv.data.obs, cv.data.obs_id_cols)
+
+	ids_a = ids[mask,:]
+	ids_b = b === nothing ? nothing : ids[.!mask,:]
+
+	for v in gater.stack
+		data = v.data
+		if !(col in names(data.obs))
+			data.obs[!,col] = missings(T,size(data.obs,1))
+		end
+
+		ids = copy(ids_a; copycols=false)
+		ids.__present__ .= true
+		merged = leftjoin(data.obs, ids; on=data.obs_id_cols, order=:left)
+		m = .!ismissing.(merged.__present__)
+		data.obs[m,col] .= a
+
+		if b !== nothing
+			ids = copy(ids_b; copycols=false)
+			ids.__present__ .= true
+			merged = leftjoin(data.obs, ids; on=data.obs_id_cols, order=:left)
+			m = .!ismissing.(merged.__present__)
+			data.obs[m,col] .= b
+		end
+
+	end
+
+end
 
