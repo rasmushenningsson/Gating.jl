@@ -6,6 +6,7 @@ using Observables
 using GLMakie
 using Colors
 using UMAP
+using PointInPoly
 
 export gate
 

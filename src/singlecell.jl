@@ -49,7 +49,7 @@ function SingleCellGater(data::DataMatrix)
 	x = pl.axis.xlabel
 	y = pl.axis.ylabel
 
-	poly_coords = Observable(zeros(2,3))
+	poly_coords = Observable(zeros(2,1))
 	poly_color = Observable{RGB{Float64}}(colorant"yellow")
 	poly_pl = poly!(pl.axis, poly_coords; visible=true, strokewidth=2, color=poly_color, alpha=0.2)
 
@@ -128,6 +128,10 @@ function Base.push!(gater::SingleCellGater, ids::DataFrame)
 	push!(gater.stack, DataView(filtered))
 	gater.coords[] = vcat(get_var(gater, gater.x[])', get_var(gater, gater.y[])')
 
+
+	gater.poly_pl.visible[] = size(gater.coords[],2)>1
+
+
 	gater
 end
 
@@ -140,6 +144,19 @@ function Base.pop!(gater::SingleCellGater)
 	select(popped.data.obs, popped.data.obs_id_cols)
 end
 
+
+function poly_mask(poly, points)
+	n = size(poly,2)
+	faces = ( (((poly[1,i],poly[2,i]),(poly[1,mod1(i+1,n)],poly[2,mod1(i+1,n)])) for i in 1:size(poly,2))..., )
+
+	x_ext,y_ext = extrema(poly; dims=2)
+	start = (x_ext[1],y_ext[1])
+	stop = (x_ext[2],y_ext[2])
+
+	BitVector((pinpoly((points[1,i],points[2,i]), faces, start, stop)!=0 for i in 1:size(points,2)))
+end
+
+
 function key_handler(gater::SingleCellGater, event)
 	if event.key == Makie.Keyboard.left_shift
 		if event.action == Makie.Keyboard.press
@@ -147,8 +164,36 @@ function key_handler(gater::SingleCellGater, event)
 		else#if event.action == Makie.Keyboard.release
 			gater.poly_state[] = :finished
 			gater.poly_color[] = colorant"green"
+
+			# a little trick to ensure that Makie ignores the polygon when fitting the plot area (ctrl+left_click)
+			pc = gater.poly_coords[]
+			if size(pc,2)==1
+				pc .= NaN
+				notify(gater.poly_coords)
+			end
+		end
+	elseif (event.key == Makie.Keyboard.enter || event.key == Makie.Keyboard.space) && event.action == Makie.Keyboard.press
+		if gater.poly_state[] == :finished
+			mask = poly_mask(gater.poly_coords[], gater.coords[])
+
+			if event.key == Makie.Keyboard.space
+				mask = .!mask
+			end
+
+			n_selected = count(mask)
+			if n_selected == 0
+				@info "No cells selected, aborting"
+			elseif n_selected == length(mask)
+				@info "All cells selected, aborting"
+			else
+				v = curr_view(gater)
+				ids = select(v.data.obs, v.data.obs_id_cols)
+				push!(gater, ids[mask,:])
+			end
 		end
 	end
+
+
 end
 
 function mouse_handler(gater::SingleCellGater, event)
