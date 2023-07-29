@@ -129,7 +129,8 @@ function colors_changed(gater::SingleCellGater, val; lazy=false)
 		m,M = extrema(skipmissing(x))
 		α = (x.-m)./(M-m)
 
-		c = [ismissing(a) ? RGB(1.,0,1) : RGB(a,a/2,0) for a in α]
+		# hardcoded colorscale
+		c = [ismissing(a) ? RGB(0.,0,0) : RGB(a,a/2,1-a) for a in α]
 	end
 
 	if lazy
