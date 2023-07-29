@@ -4,6 +4,7 @@ using SingleCellProjections
 using DataFrames
 using Observables
 using GLMakie
+using Colors
 using UMAP
 
 export gate

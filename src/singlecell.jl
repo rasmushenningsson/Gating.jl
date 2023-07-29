@@ -33,6 +33,8 @@ struct SingleCellGater <: AbstractGater
 	pl::Any
 
 	poly_coords::Observable{Matrix{Float64}}
+	poly_color::Observable{RGB{Float64}}
+	poly_state::Base.RefValue{Symbol} # new, creating, finished
 	poly_pl::Any
 
 	stack::Vector{DataView}
@@ -48,12 +50,15 @@ function SingleCellGater(data::DataMatrix)
 	y = pl.axis.ylabel
 
 	poly_coords = Observable(zeros(2,3))
-	poly_pl = poly!(pl.axis, poly_coords; visible=false, strokewidth=2)
+	poly_color = Observable{RGB{Float64}}(colorant"yellow")
+	poly_pl = poly!(pl.axis, poly_coords; visible=true, strokewidth=2, color=poly_color, alpha=0.2)
 
 	gater = SingleCellGater(data, x, y,
 	                        coords,
 	                        pl,
 	                        poly_coords,
+	                        poly_color,
+	                        Ref(:finished),
 	                        poly_pl,
 	                        [DataView(data)],
 	                        Ref{Union{Float64,Nothing}}(nothing),
@@ -68,6 +73,9 @@ function SingleCellGater(data::DataMatrix)
 	end
 	on(events(pl.figure.scene).mousebutton; priority=10) do event
 		mouse_handler(gater, event)
+	end
+	on(events(pl.figure.scene).keyboardbutton) do event
+		key_handler(gater, event)
 	end
 	
 	gater
@@ -132,36 +140,63 @@ function Base.pop!(gater::SingleCellGater)
 	select(popped.data.obs, popped.data.obs_id_cols)
 end
 
-function mouse_handler(gater::SingleCellGater, event)
-	pl = gater.pl
-	if Keyboard.left_shift in events(pl.figure.scene).keyboardstate
-		if event.button == Mouse.left && event.action == Mouse.press
-			gater.selection_x1[],gater.selection_y1[] = mouseposition(pl.axis.scene)
-			@info "selection started at ($(gater.selection_x1[]),$(gater.selection_y1[]))"
-
-			return Consume()
-		elseif event.button == Mouse.left && event.action == Mouse.release
-			x1,y1 = gater.selection_x1[], gater.selection_y1[] 
-			x2,y2 = mouseposition(pl.axis.scene)
-
-			x1,x2 = minmax(x1,x2)
-			y1,y2 = minmax(y1,y2)
-			@info "selection performed ($x1,$y1,$x2,$y2)"
-
-			mask = (x1 .<= gater.coords[][1,:] .<= x2) .& (y1 .<= gater.coords[][2,:] .<= y2)
-
-			if count(mask) > 0
-				@info "$(count(mask)) cells selected"
-				v = curr_view(gater)
-				ids = select(v.data.obs, v.data.obs_id_cols)
-				push!(gater, ids[mask,:])
-			else
-				@info "No cells selected, aborting"
-			end
-
-			return Consume()
+function key_handler(gater::SingleCellGater, event)
+	if event.key == Makie.Keyboard.left_shift
+		if event.action == Makie.Keyboard.press
+			gater.poly_state[] = :new
+		else#if event.action == Makie.Keyboard.release
+			gater.poly_state[] = :finished
+			gater.poly_color[] = colorant"green"
 		end
 	end
+end
+
+function mouse_handler(gater::SingleCellGater, event)
+	pl = gater.pl
+
+	poly_state = gater.poly_state[]
+	if poly_state != :finished
+		if event.button == Mouse.left && event.action == Mouse.press
+			poly_coords = poly_state==:new ? zeros(2,0) : gater.poly_coords[]
+			mouse_coords = Float64[mouseposition(pl.axis.scene)...]
+			poly_coords = hcat(poly_coords, mouse_coords)
+
+			gater.poly_coords[] = poly_coords
+			gater.poly_state[] = :creating
+			gater.poly_color[] = colorant"yellow"
+
+			return Consume()
+		end 
+	end
+
+	# if Keyboard.left_shift in events(pl.figure.scene).keyboardstate
+	# 	if event.button == Mouse.left && event.action == Mouse.press
+	# 		gater.selection_x1[],gater.selection_y1[] = mouseposition(pl.axis.scene)
+	# 		@info "selection started at ($(gater.selection_x1[]),$(gater.selection_y1[]))"
+
+	# 		return Consume()
+	# 	elseif event.button == Mouse.left && event.action == Mouse.release
+	# 		x1,y1 = gater.selection_x1[], gater.selection_y1[] 
+	# 		x2,y2 = mouseposition(pl.axis.scene)
+
+	# 		x1,x2 = minmax(x1,x2)
+	# 		y1,y2 = minmax(y1,y2)
+	# 		@info "selection performed ($x1,$y1,$x2,$y2)"
+
+	# 		mask = (x1 .<= gater.coords[][1,:] .<= x2) .& (y1 .<= gater.coords[][2,:] .<= y2)
+
+	# 		if count(mask) > 0
+	# 			@info "$(count(mask)) cells selected"
+	# 			v = curr_view(gater)
+	# 			ids = select(v.data.obs, v.data.obs_id_cols)
+	# 			push!(gater, ids[mask,:])
+	# 		else
+	# 			@info "No cells selected, aborting"
+	# 		end
+
+	# 		return Consume()
+	# 	end
+	# end
 end
 
 
