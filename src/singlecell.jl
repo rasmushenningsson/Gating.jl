@@ -49,7 +49,7 @@ function SingleCellGater(data::DataMatrix)
 	x = pl.axis.xlabel
 	y = pl.axis.ylabel
 
-	poly_coords = Observable(zeros(2,1))
+	poly_coords = Observable(fill(NaN,2,1))
 	poly_color = Observable{RGB{Float64}}(colorant"yellow")
 	poly_pl = poly!(pl.axis, poly_coords; visible=true, strokewidth=2, color=poly_color, alpha=0.2)
 
@@ -189,6 +189,12 @@ function key_handler(gater::SingleCellGater, event)
 				push!(gater, ids[mask,:])
 			end
 		end
+	elseif event.key == Makie.Keyboard.escape && event.action == Makie.Keyboard.press
+		gater.poly_state[] = :finished
+		gater.poly_color[] = colorant"green"
+
+		# a little trick to ensure that Makie ignores the polygon when fitting the plot area (ctrl+left_click)
+		gater.poly_coords[] = fill(NaN,2,1)
 	end
 
 
