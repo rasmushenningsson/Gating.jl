@@ -25,8 +25,8 @@ end
 struct SingleCellGater <: AbstractGater
 	data::DataMatrix # original data
 
-	x::Observable{String}
-	y::Observable{String}
+	x::Observable{Any}
+	y::Observable{Any}
 
 	coords::Observable{Matrix{Float64}}
 	# colors::Observable # TODO
@@ -39,12 +39,11 @@ struct SingleCellGater <: AbstractGater
 	selection_y1::Base.RefValue{Union{Float64,Nothing}}
 end
 function SingleCellGater(data::DataMatrix)
-	x = Observable("")
-	y = Observable("")
 	coords = Observable(zeros(2,size(data,2)))
 
-
 	pl = scatter(coords)
+	x = pl.axis.xlabel
+	y = pl.axis.ylabel
 
 	gater = SingleCellGater(data, x, y,
 	                        coords,
@@ -118,7 +117,6 @@ function Base.push!(gater::SingleCellGater, ids::DataFrame)
 end
 
 function Base.pop!(gater::SingleCellGater)
-	# TODO: Remove the top item from the stack (do not allow empty stack) and return the selected cells from the popped view
 	@assert length(gater.stack)>1
 	popped = pop!(gater.stack)
 
@@ -129,7 +127,6 @@ end
 
 function mouse_handler(gater::SingleCellGater, event)
 	pl = gater.pl
-	# @show event
 	if Keyboard.left_shift in events(pl.figure.scene).keyboardstate
 		if event.button == Mouse.left && event.action == Mouse.press
 			gater.selection_x1[],gater.selection_y1[] = mouseposition(pl.axis.scene)
