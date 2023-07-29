@@ -27,9 +27,10 @@ struct SingleCellGater <: AbstractGater
 
 	x::Observable{Any}
 	y::Observable{Any}
+	color::Observable{String}
 
 	coords::Observable{Matrix{Float64}}
-	# colors::Observable # TODO
+	colors::Observable{Vector{RGB{Float64}}}
 	pl::Any
 
 	poly_coords::Observable{Matrix{Float64}}
@@ -43,9 +44,10 @@ struct SingleCellGater <: AbstractGater
 	selection_y1::Base.RefValue{Union{Float64,Nothing}}
 end
 function SingleCellGater(data::DataMatrix)
-	coords = Observable(zeros(2,size(data,2)))
+	coords = Observable(zeros(2, size(data,2)))
+	colors = Observable(fill(RGB{Float64}(0,0,0), size(data,2)))
 
-	pl = scatter(coords)
+	pl = scatter(coords; color=colors)
 	x = pl.axis.xlabel
 	y = pl.axis.ylabel
 
@@ -53,8 +55,11 @@ function SingleCellGater(data::DataMatrix)
 	poly_color = Observable{RGB{Float64}}(colorant"yellow")
 	poly_pl = poly!(pl.axis, poly_coords; visible=true, strokewidth=2, color=poly_color, alpha=0.2)
 
-	gater = SingleCellGater(data, x, y,
+	gater = SingleCellGater(data,
+	                        x, y,
+	                        Observable(""),
 	                        coords,
+	                        colors,
 	                        pl,
 	                        poly_coords,
 	                        poly_color,
@@ -70,6 +75,9 @@ function SingleCellGater(data::DataMatrix)
 	end
 	on(y) do val
 		y_changed(gater, val)
+	end
+	on(gater.color) do val
+		colors_changed(gater, val)
 	end
 	on(events(pl.figure.scene).mousebutton; priority=10) do event
 		mouse_handler(gater, event)
@@ -94,6 +102,8 @@ function get_var(gater::SingleCellGater, name::String)
 		i = parse(Int, name[5:end])
 		umapped = get_umapped(v)
 		return umapped.matrix[i,:]
+	elseif name==""
+		return zeros(size(v.data,2))
 	else
 		i = findfirst(isequal(name), v.data.var.name)
 		ei = zeros(1,size(v.data,1))
@@ -105,12 +115,28 @@ end
 function x_changed(gater::SingleCellGater, val)
 	gater.coords[][1,:] .= get_var(gater, val)
 	notify(gater.coords)
-	# TODO: also update x axis name
 end
 function y_changed(gater::SingleCellGater, val)
 	gater.coords[][2,:] .= get_var(gater, val)
 	notify(gater.coords)
-	# TODO: also update y axis name
+end
+function colors_changed(gater::SingleCellGater, val; lazy=false)
+	x = get_var(gater, val)
+
+	if all(ismissing,x)
+		c = fill(RGB(0.0, 0, 0), length(x))
+	else
+		m,M = extrema(skipmissing(x))
+		α = (x.-m)./(M-m)
+
+		c = [ismissing(a) ? RGB(1.,0,1) : RGB(a,a/2,0) for a in α]
+	end
+
+	if lazy
+		gater.colors.val = c
+	else
+		gater.colors[] = c
+	end
 end
 
 
@@ -124,8 +150,11 @@ function Base.push!(gater::SingleCellGater, ids::DataFrame)
 
 	filtered = gater.data[:,mask]
 	push!(gater.stack, DataView(filtered))
-	gater.coords[] = vcat(get_var(gater, gater.x[])', get_var(gater, gater.y[])')
 
+	# update coordinates and colors
+	colors_changed(gater, gater.color[]; lazy=true)
+	gater.coords[] = vcat(get_var(gater, gater.x[])', get_var(gater, gater.y[])')
+	notify(gater.colors)
 
 	gater.poly_pl.visible[] = size(gater.coords[],2)>1
 
@@ -137,7 +166,9 @@ function Base.pop!(gater::SingleCellGater)
 	@assert length(gater.stack)>1
 	popped = pop!(gater.stack)
 
+	colors_changed(gater, gater.color[]; lazy=true)
 	gater.coords[] = vcat(get_var(gater, gater.x[])', get_var(gater, gater.y[])')
+	notify(gater.colors)
 
 	select(popped.data.obs, popped.data.obs_id_cols)
 end
