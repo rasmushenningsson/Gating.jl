@@ -30,8 +30,10 @@ struct SingleCellGater <: AbstractGater
 
 	coords::Observable{Matrix{Float64}}
 	# colors::Observable # TODO
-
 	pl::Any
+
+	poly_coords::Observable{Matrix{Float64}}
+	poly_pl::Any
 
 	stack::Vector{DataView}
 
@@ -45,9 +47,14 @@ function SingleCellGater(data::DataMatrix)
 	x = pl.axis.xlabel
 	y = pl.axis.ylabel
 
+	poly_coords = Observable(zeros(2,3))
+	poly_pl = poly!(pl.axis, poly_coords; visible=false, strokewidth=2)
+
 	gater = SingleCellGater(data, x, y,
 	                        coords,
 	                        pl,
+	                        poly_coords,
+	                        poly_pl,
 	                        [DataView(data)],
 	                        Ref{Union{Float64,Nothing}}(nothing),
 	                        Ref{Union{Float64,Nothing}}(nothing),
