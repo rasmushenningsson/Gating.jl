@@ -77,7 +77,7 @@ function SingleCellGater(data::DataMatrix)
 		y_changed(gater, val)
 	end
 	on(gater.color) do val
-		colors_changed(gater, val)
+		color_changed(gater, val)
 	end
 	on(events(pl.figure.scene).mousebutton; priority=10) do event
 		mouse_handler(gater, event)
@@ -104,6 +104,8 @@ function get_var(gater::SingleCellGater, name::String)
 		return umapped.matrix[i,:]
 	elseif name==""
 		return zeros(size(v.data,2))
+	elseif startswith(name, "obs.")
+		return v.data.obs[:,name[5:end]]
 	else
 		i = findfirst(isequal(name), v.data.var.name)
 		ei = zeros(1,size(v.data,1))
@@ -120,17 +122,34 @@ function y_changed(gater::SingleCellGater, val)
 	gater.coords[][2,:] .= get_var(gater, val)
 	notify(gater.coords)
 end
-function colors_changed(gater::SingleCellGater, val; lazy=false)
+
+
+function values2colors(v::AbstractVector{<:Union{Nothing,<:Number}})
+	m,M = extrema(skipmissing(v))
+	α = (v.-m)./(M-m)
+
+	# hardcoded colorscale
+	c = [ismissing(a) ? RGB(0.,0,0) : RGB(a,a/2,1-a) for a in α]
+end
+function values2colors(v::AbstractVector)
+	u = unique(vcat(missing,v)) # Ensures black is assigned to missing since missing will always be first
+	col = distinguishable_colors(length(u), [RGB(0.0,0.0,0.0)])
+
+	ind = identity.(indexin(v,u))
+
+	color_table = DataFrame(groups=u, color=col)
+	@show color_table
+
+	col[ind]
+end
+
+function color_changed(gater::SingleCellGater, val; lazy=false)
 	x = get_var(gater, val)
 
 	if all(ismissing,x)
 		c = fill(RGB(0.0, 0, 0), length(x))
 	else
-		m,M = extrema(skipmissing(x))
-		α = (x.-m)./(M-m)
-
-		# hardcoded colorscale
-		c = [ismissing(a) ? RGB(0.,0,0) : RGB(a,a/2,1-a) for a in α]
+		c = values2colors(x)
 	end
 
 	if lazy
@@ -153,7 +172,7 @@ function Base.push!(gater::SingleCellGater, ids::DataFrame)
 	push!(gater.stack, DataView(filtered))
 
 	# update coordinates and colors
-	colors_changed(gater, gater.color[]; lazy=true)
+	color_changed(gater, gater.color[]; lazy=true)
 	gater.coords[] = vcat(get_var(gater, gater.x[])', get_var(gater, gater.y[])')
 	notify(gater.colors)
 
@@ -167,7 +186,7 @@ function Base.pop!(gater::SingleCellGater)
 	@assert length(gater.stack)>1
 	popped = pop!(gater.stack)
 
-	colors_changed(gater, gater.color[]; lazy=true)
+	color_changed(gater, gater.color[]; lazy=true)
 	gater.coords[] = vcat(get_var(gater, gater.x[])', get_var(gater, gater.y[])')
 	notify(gater.colors)
 
