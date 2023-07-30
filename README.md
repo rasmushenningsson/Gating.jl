@@ -105,6 +105,7 @@ gater.color[] = "celltype.l1"
 
 #### Annotations
 The current polygon can also be used to create/update cell annotations.
+This will update the `DataMatrix` object that was used to launch the user interface.
 
 To create/update a column "MyColumn", with values `true` for cells within the polygon and `false` for those outside, use:
 ```julia

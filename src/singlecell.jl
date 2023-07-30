@@ -89,6 +89,8 @@ function SingleCellGater(data::DataMatrix)
 	gater
 end
 
+Base.display(gater::SingleCellGater) = display(gater.pl)
+
 curr_view(gater::SingleCellGater) = gater.stack[end]
 
 function get_var(gater::SingleCellGater, name::String)
@@ -339,6 +341,5 @@ function annotate!(gater::SingleCellGater, col, a::T1=true, b::T2=nothing) where
 		end
 
 	end
-
 end
 
