@@ -12,6 +12,15 @@ PointInPoly = "b33f1834-3304-4c26-96eb-60ff7015163d"
 SingleCellProjections = "03d38035-ed2f-4a36-82eb-797f1727ab2e"
 UMAP = "c4f8c510-2410-5be4-91d7-4fbaeb39457e"
 
+[compat]
+Colors = "0.12"
+DataFrames = "1"
+Observables = "0.5"
+GLMakie = "0.8"
+PointInPoly = "1"
+SingleCellProjections = "0.3"
+UMAP = "0.1"
+
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
