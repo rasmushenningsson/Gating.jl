@@ -119,10 +119,12 @@ end
 function x_changed(gater::SingleCellGater, val)
 	gater.coords[][1,:] .= get_var(gater, val)
 	notify(gater.coords)
+	reset_limits!(gater.pl.axis; xauto=true, yauto=false)
 end
 function y_changed(gater::SingleCellGater, val)
 	gater.coords[][2,:] .= get_var(gater, val)
 	notify(gater.coords)
+	reset_limits!(gater.pl.axis; xauto=false, yauto=true)
 end
 
 
